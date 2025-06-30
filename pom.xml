@@ -43,17 +43,6 @@
 	<build>
 		<plugins>
 			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-surefire-plugin</artifactId>
-				<version>3.0.0-M9</version> <!-- You can use latest -->
-				<configuration>
-					<includes>
-						<include>**/*Test.java</include>
-					</includes>
-				</configuration>
-			</plugin>
-
-			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
@@ -73,8 +62,22 @@
 				<groupId>pl.project13.maven</groupId>
 				<artifactId>git-commit-id-plugin</artifactId>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.0.0-M9</version>
+				<configuration>
+					<useFile>true</useFile> <!-- Ensures XML files are written -->
+					<includes>
+						<include>**/*Test.java</include>
+						<include>**/*Tests.java</include>
+					</includes>
+				</configuration>
+			</plugin>
+
 		</plugins>
 		<finalName>devops_integration</finalName>
 	</build>
+
 
 </project>
