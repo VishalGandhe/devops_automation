@@ -70,11 +70,30 @@ pipeline {
         stage('Health Check') {
             steps {
                 script {
-                    sleep 5 // Wait for app to start
-                    echo "Checking API at http://localhost:${env.HOST_PORT}/api/hello"
-                    sh """
-                        curl --fail --silent http://localhost:${env.HOST_PORT}/api/hello || exit 1
-                    """
+                    echo "Waiting for app to be ready on port ${env.HOST_PORT}..."
+
+                    def retries = 10
+                    def delay = 3
+                    def success = false
+
+                    for (int i = 0; i < retries; i++) {
+                        def status = sh(
+                            script: "curl --silent --fail http://localhost:${env.HOST_PORT}/api/hello || true",
+                            returnStatus: true
+                        )
+                        if (status == 0) {
+                            echo "✅ API is up and running!"
+                            success = true
+                            break
+                        } else {
+                            echo "⏳ API not yet ready. Retry ${i + 1}/${retries}..."
+                            sleep(delay)
+                        }
+                    }
+
+                    if (!success) {
+                        error("❌ API did not respond in time on http://localhost:${env.HOST_PORT}/api/hello")
+                    }
                 }
             }
         }
@@ -85,7 +104,7 @@ pipeline {
             echo "✅ Build and deployment successful at http://localhost:${env.HOST_PORT}/api/hello"
         }
         failure {
-            echo '❌ Build or deployment failed. Please check logs.'
+            echo '❌ Build or deployment failed. Check logs for details.'
         }
     }
 }

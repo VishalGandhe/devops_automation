@@ -9,13 +9,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class DevopsIntegrationApplication {
 
-	@GetMapping
-	public String message(){
-		return "welcome to javatechie";
+	// This matches what Jenkins is checking: /api/hello
+	@GetMapping("/api/hello")
+	public String message() {
+		return "Welcome to Build and Deploy from Docker!";
 	}
 
 	public static void main(String[] args) {
 		SpringApplication.run(DevopsIntegrationApplication.class, args);
 	}
-
 }
