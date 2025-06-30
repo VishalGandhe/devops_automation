@@ -22,7 +22,25 @@ pipeline {
 
         stage('Build with Maven') {
             steps {
-                sh 'mvn clean install'
+                sh 'mvn clean compile'
+            }
+        }
+
+        stage('Run Unit Tests') {
+            steps {
+                sh 'mvn test'
+            }
+
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'
+                }
+                success {
+                    echo "✅ Unit tests passed."
+                }
+                failure {
+                    echo "❌ Some unit tests failed."
+                }
             }
         }
 
@@ -50,18 +68,13 @@ pipeline {
         stage('Deploy Docker Image on Local Machine') {
             steps {
                 script {
-                    // Stop and remove old container if exists
                     sh "docker rm -f ${CONTAINER_NAME} || true"
 
-                    // Check if port 8080 is in use, fallback to 8081
                     def portCheck = sh(script: "lsof -i :8080 || netstat -an | grep 8080", returnStatus: true)
                     env.HOST_PORT = (portCheck == 0) ? "8081" : "8080"
                     echo "Using port ${env.HOST_PORT} for deployment"
 
-                    // Pull latest image
                     sh "docker pull ${IMAGE_TAG}"
-
-                    // Run the new container
                     sh "docker run -d -p ${env.HOST_PORT}:8080 --name ${CONTAINER_NAME} ${IMAGE_TAG}"
                 }
             }
