@@ -28,11 +28,23 @@ pipeline {
 
         stage('Run Unit Tests') {
             steps {
-                sh 'mvn test'
+                script {
+                    // Run unit tests
+                    sh 'mvn test'
+
+                    // Debug: Check if test result files exist
+                    sh 'echo "Listing surefire-reports:"'
+                    sh 'ls -l target/surefire-reports || true'
+
+                    // Debug: Show all XML files in the project
+                    sh 'echo "Finding all XML files:"'
+                    sh 'find . -name "*.xml" || true'
+                }
             }
 
             post {
                 always {
+                    // Archive test results
                     junit '**/target/surefire-reports/*.xml'
                 }
                 success {
