@@ -2,14 +2,15 @@ pipeline {
     agent any
 
     tools {
-        jdk 'JDK'         // Pre-configured in Jenkins
-        maven 'Maven'     // Pre-configured in Jenkins
+        jdk 'JDK'
+        maven 'Maven'
     }
 
     environment {
         DOCKER_IMAGE = 'vishalgandhe/devops_integration'
-        DOCKER_CRED_ID = 'dockerhubpwd'  // DockerHub password/token stored in Jenkins credentials
+        DOCKER_CRED_ID = 'dockerhubpwd'
         GIT_REPO = 'https://github.com/VishalGandhe/devops_automation'
+        CONTAINER_NAME = 'springboot-api'
     }
 
     stages {
@@ -28,8 +29,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
-                    sh "docker build -t ${imageTag} ."
+                    env.IMAGE_TAG = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
+                    sh "docker build -t ${IMAGE_TAG} ."
                 }
             }
         }
@@ -37,11 +38,10 @@ pipeline {
         stage('Push Docker Image to Docker Hub') {
             steps {
                 script {
-                    def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
                     withCredentials([string(credentialsId: "${DOCKER_CRED_ID}", variable: 'dockerhubpwd')]) {
                         sh "echo ${dockerhubpwd} | docker login -u vishalgandhe --password-stdin"
-                        sh "docker push ${imageTag}"
-                        sh 'docker logout'
+                        sh "docker push ${IMAGE_TAG}"
+                        sh "docker logout"
                     }
                 }
             }
@@ -50,16 +50,19 @@ pipeline {
         stage('Deploy Docker Image on Local Machine') {
             steps {
                 script {
-                    def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
+                    // Stop and remove old container if exists
+                    sh "docker rm -f ${CONTAINER_NAME} || true"
 
-                    // Stop and remove existing container if running
-                    sh "docker rm -f springboot-api || true"
+                    // Check if port 8080 is in use, fallback to 8081
+                    def portCheck = sh(script: "lsof -i :8080 || netstat -an | grep 8080", returnStatus: true)
+                    env.HOST_PORT = (portCheck == 0) ? "8081" : "8080"
+                    echo "Using port ${env.HOST_PORT} for deployment"
 
                     // Pull latest image
-                    sh "docker pull ${imageTag}"
+                    sh "docker pull ${IMAGE_TAG}"
 
-                    // Run new container
-                    sh "docker run -d -p 8080:8080 --name springboot-api ${imageTag}"
+                    // Run the new container
+                    sh "docker run -d -p ${env.HOST_PORT}:8080 --name ${CONTAINER_NAME} ${IMAGE_TAG}"
                 }
             }
         }
@@ -67,12 +70,11 @@ pipeline {
         stage('Health Check') {
             steps {
                 script {
-                    // Wait for the container to start
-                    sleep 5
-                    sh '''
-                        echo "Checking API health..."
-                        curl --fail --silent http://localhost:8080/api/hello || exit 1
-                    '''
+                    sleep 5 // Wait for app to start
+                    echo "Checking API at http://localhost:${env.HOST_PORT}/api/hello"
+                    sh """
+                        curl --fail --silent http://localhost:${env.HOST_PORT}/api/hello || exit 1
+                    """
                 }
             }
         }
@@ -80,10 +82,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Build and deployment successful!'
+            echo "✅ Build and deployment successful at http://localhost:${env.HOST_PORT}/api/hello"
         }
         failure {
-            echo '❌ Build or deployment failed. Check the logs.'
+            echo '❌ Build or deployment failed. Please check logs.'
         }
     }
 }
