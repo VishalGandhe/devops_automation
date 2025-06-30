@@ -74,8 +74,8 @@
 					</includes>
 				</configuration>
 			</plugin>
-
 		</plugins>
+
 		<finalName>devops_integration</finalName>
 	</build>
 
