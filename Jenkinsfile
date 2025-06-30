@@ -10,7 +10,7 @@ pipeline {
         DOCKER_IMAGE = 'vishalgandhe/devops_integration'
         DOCKER_CRED_ID = 'dockerhubpwd'  // Jenkins credentials ID for DockerHub password/token
         GIT_REPO = 'https://github.com/VishalGandhe/devops_automation'
-        EMAIL_RECIPIENTS = 'vishalgandhe1806@gmail.com'
+        EMAIL_RECIPIENTS = 'vishalgandhe1806@gmail.com'  // ✅ Replace with actual team email(s)
     }
 
     stages {
@@ -52,18 +52,28 @@ pipeline {
     post {
         success {
             echo '✅ Build and Docker push successful!'
+            emailext(
+                to: "${EMAIL_RECIPIENTS}",
+                subject: "✅ Jenkins Job '${env.JOB_NAME}' (#${env.BUILD_NUMBER}) Passed",
+                body: """<p>Hi Team,</p>
+                         <p>The Jenkins build <b>#${env.BUILD_NUMBER}</b> of job <b>${env.JOB_NAME}</b> has <span style='color:green;'>SUCCEEDED</span>.</p>
+                         <p><b>Branch:</b> ${env.GIT_BRANCH}<br/>
+                         <b>Build URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                         <br/>
+                         <p>Regards,<br/>Jenkins</p>""",
+                mimeType: 'text/html'
+            )
         }
 
         failure {
             echo '❌ Build failed! Sending notification email...'
-
             emailext(
                 to: "${EMAIL_RECIPIENTS}",
                 subject: "❌ Jenkins Job '${env.JOB_NAME}' (#${env.BUILD_NUMBER}) Failed",
                 body: """<p>Hi Team,</p>
                          <p>The Jenkins build <b>#${env.BUILD_NUMBER}</b> of job <b>${env.JOB_NAME}</b> has <span style='color:red;'>FAILED</span>.</p>
                          <p><b>Branch:</b> ${env.GIT_BRANCH}<br/>
-                         <b>URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                         <b>Build URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
                          <br/>
                          <p>Regards,<br/>Jenkins</p>""",
                 mimeType: 'text/html'
