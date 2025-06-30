@@ -22,29 +22,23 @@ pipeline {
 
         stage('Build with Maven') {
             steps {
-                sh 'mvn clean compile'
+                // Builds the application and generates JAR in target/
+                sh 'mvn clean package'
+                // Debug: show JAR file
+                sh 'ls -l target/*.jar || true'
             }
         }
 
         stage('Run Unit Tests') {
             steps {
                 script {
-                    // Run unit tests
                     sh 'mvn test'
-
-                    // Debug: Check if test result files exist
-                    sh 'echo "Listing surefire-reports:"'
                     sh 'ls -l target/surefire-reports || true'
-
-                    // Debug: Show all XML files in the project
-                    sh 'echo "Finding all XML files:"'
                     sh 'find . -name "*.xml" || true'
                 }
             }
-
             post {
                 always {
-                    // Archive test results
                     junit '**/target/surefire-reports/*.xml'
                 }
                 success {
@@ -60,6 +54,8 @@ pipeline {
             steps {
                 script {
                     env.IMAGE_TAG = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
+                    // Confirm JAR file exists before Docker build
+                    sh 'ls -l target/*.jar || (echo "❌ JAR not found!" && exit 1)'
                     sh "docker build -t ${IMAGE_TAG} ."
                 }
             }
