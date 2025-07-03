@@ -1,131 +1,33 @@
-pipeline {
+pipeline{
     agent any
-
-    tools {
+    tools{
         jdk 'JDK'
         maven 'Maven'
     }
+    stages{
+        stage('Build Maven'){
+            steps{
+                checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/VishalGandhe/devops_automation']])
+                     sh 'mvn clean install'
 
-    environment {
-        DOCKER_IMAGE = 'vishalgandhe/devops_integration'
-        DOCKER_CRED_ID = 'dockerhubpwd'
-        GIT_REPO = 'https://github.com/VishalGandhe/devops_automation'
-        CONTAINER_NAME = 'springboot-api'
-    }
-
-    stages {
-        stage('Checkout Code') {
-            steps {
-                git branch: 'main', url: "${GIT_REPO}"
             }
         }
-
-        stage('Build with Maven') {
-            steps {
-                // Builds the application and generates JAR in target/
-                sh 'mvn clean package'
-                // Debug: show JAR file
-                sh 'ls -l target/*.jar || true'
-            }
-        }
-
-        stage('Run Unit Tests') {
-            steps {
-                script {
-                    sh 'mvn test'
-                    sh 'ls -l target/surefire-reports || true'
-                    sh 'find . -name "*.xml" || true'
-                }
-            }
-            post {
-                always {
-                    junit '**/target/surefire-reports/*.xml'
-                }
-                success {
-                    echo "✅ Unit tests passed."
-                }
-                failure {
-                    echo "❌ Some unit tests failed."
+        stage('Build docker image'){
+            steps{
+                script{
+                    sh 'docker build -t vishalgandhe/devops_integration . '
                 }
             }
         }
-
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    env.IMAGE_TAG = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
-                    // Confirm JAR file exists before Docker build
-                    sh 'ls -l target/*.jar || (echo "❌ JAR not found!" && exit 1)'
-                    sh "docker build -t ${IMAGE_TAG} ."
+        stage('Push image to Hub'){
+            steps{
+                script{
+                    withCredentials([string(credentialsId: 'dockerhubpwd', variable: 'dockerhubpwd')]) {
+                        sh 'docker login -u vishalgandhe -p ${dockerhubpwd}'
+}
+                    sh 'docker push vishalgandhe/devops_integration'
                 }
             }
-        }
-
-        stage('Push Docker Image to Docker Hub') {
-            steps {
-                script {
-                    withCredentials([string(credentialsId: "${DOCKER_CRED_ID}", variable: 'dockerhubpwd')]) {
-                        sh "echo ${dockerhubpwd} | docker login -u vishalgandhe --password-stdin"
-                        sh "docker push ${IMAGE_TAG}"
-                        sh "docker logout"
-                    }
-                }
-            }
-        }
-
-        stage('Deploy Docker Image on Local Machine') {
-            steps {
-                script {
-                    sh "docker rm -f ${CONTAINER_NAME} || true"
-
-                    def portCheck = sh(script: "lsof -i :8080 || netstat -an | grep 8080", returnStatus: true)
-                    env.HOST_PORT = (portCheck == 0) ? "8081" : "8080"
-                    echo "Using port ${env.HOST_PORT} for deployment"
-
-                    sh "docker pull ${IMAGE_TAG}"
-                    sh "docker run -d -p ${env.HOST_PORT}:8080 --name ${CONTAINER_NAME} ${IMAGE_TAG}"
-                }
-            }
-        }
-
-        stage('Health Check') {
-            steps {
-                script {
-                    echo "Waiting for app to be ready on port ${env.HOST_PORT}..."
-
-                    def retries = 10
-                    def delay = 3
-                    def success = false
-
-                    for (int i = 0; i < retries; i++) {
-                        def status = sh(
-                            script: "curl --silent --fail http://localhost:${env.HOST_PORT}/api/hello || true",
-                            returnStatus: true
-                        )
-                        if (status == 0) {
-                            echo "✅ API is up and running!"
-                            success = true
-                            break
-                        } else {
-                            echo "⏳ API not yet ready. Retry ${i + 1}/${retries}..."
-                            sleep(delay)
-                        }
-                    }
-
-                    if (!success) {
-                        error("❌ API did not respond in time on http://localhost:${env.HOST_PORT}/api/hello")
-                    }
-                }
-            }
-        }
-    }
-
-    post {
-        success {
-            echo "✅ Build and deployment successful at http://localhost:${env.HOST_PORT}/api/hello"
-        }
-        failure {
-            echo '❌ Build or deployment failed. Check logs for details.'
         }
     }
 }
